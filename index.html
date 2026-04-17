@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Telenet AI Support</title>
+    <!-- Vapi Web SDK -->
+    <script src="https://unpkg.com/@vapi-ai/web@latest/dist/vapi.bundle.js"></script>
+    <style>
+        :root {
+            --telenet-yellow: #fcc300;
+            --bg-dark: #0f1115;
+            --card-bg: #1c1f26;
+            --user-blue: #007aff;
+        }
+
+        body {
+            margin: 0; background-color: var(--bg-dark); color: white;
+            font-family: -apple-system, system-ui, sans-serif;
+            display: flex; flex-direction: column; height: 100dvh; overflow: hidden;
+        }
+
+        /* Header */
+        .header { text-align: center; padding: 40px 20px 20px; }
+        .header h1 { color: var(--telenet-yellow); margin: 0; font-size: 22px; }
+        #status { font-size: 12px; color: #8a8d91; text-transform: uppercase; margin-top: 8px; letter-spacing: 1px; }
+
+        /* Visualizers */
+        .viz-container {
+            display: flex; justify-content: space-around; align-items: flex-end;
+            height: 60px; margin: 20px 0; padding: 0 40px;
+        }
+        .viz-group { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 40%; }
+        .bars { display: flex; align-items: flex-end; gap: 3px; height: 30px; }
+        .bar { width: 4px; border-radius: 2px; background: #333; height: 4px; transition: height 0.1s ease; }
+        .user-bar { background: var(--user-blue); }
+        .ai-bar { background: var(--telenet-yellow); }
+        .label { font-size: 9px; font-weight: bold; color: #666; }
+
+        /* Transcript Area */
+        #transcript-box {
+            flex-grow: 1; margin: 0 20px 20px; padding: 15px;
+            background: var(--card-bg); border-radius: 16px;
+            overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+            border: 1px solid #2d323d;
+        }
+        .msg { padding: 10px 14px; border-radius: 14px; font-size: 15px; line-height: 1.4; max-width: 85%; animation: slide 0.2s ease-out; }
+        .ai-msg { align-self: flex-start; background: var(--telenet-yellow); color: black; border-bottom-left-radius: 2px; }
+        .user-msg { align-self: flex-end; background: #2d323d; color: white; border-bottom-right-radius: 2px; }
+
+        /* Button */
+        .controls { display: flex; justify-content: center; padding-bottom: 50px; }
+        .btn-call {
+            width: 80px; height: 80px; border-radius: 50%; border: none;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s; box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        .start { background-color: #34c759; }
+        .stop { background-color: #ff3b30; transform: rotate(135deg); }
+        .btn-call svg { fill: white; width: 32px; height: 32px; }
+
+        @keyframes slide { from { opacity: 0; transform: translateY(10px); } }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Telenet Support</h1>
+        <div id="status">Tik om gesprek te starten</div>
+    </div>
+
+    <div class="viz-container">
+        <div class="viz-group">
+            <div class="bars" id="user-viz">
+                <div class="bar user-bar"></div><div class="bar user-bar"></div><div class="bar user-bar"></div><div class="bar user-bar"></div>
+            </div>
+            <div class="label">JIJ</div>
+        </div>
+        <div class="viz-group">
+            <div class="bars" id="ai-viz">
+                <div class="bar ai-bar"></div><div class="bar ai-bar"></div><div class="bar ai-bar"></div><div class="bar ai-bar"></div>
+            </div>
+            <div class="label">AMELIA</div>
+        </div>
+    </div>
+
+    <div id="transcript-box">
+        <div class="msg ai-msg">Hallo! Ik kan je helpen met vragen over je Telenet internet, TV of mobiele abonnement.</div>
+    </div>
+
+    <div class="controls">
+        <button id="call-toggle" class="btn-call start">
+            <svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+        </button>
+    </div>
+
+<script>
+    const vapi = new window.Vapi("bca78898-8bb5-4a72-a67a-7011887b9bc7");
+    const assistantId = "b58777cf-6ddf-4853-8b97-db4adb827fbc";
+
+    const btn = document.getElementById('call-toggle');
+    const status = document.getElementById('status');
+    const transcriptBox = document.getElementById('transcript-box');
+    const userBars = document.querySelectorAll('.user-bar');
+    const aiBars = document.querySelectorAll('.ai-bar');
+
+    let isCalling = false;
+
+    // AUDIO PRIMING & CALL LOGIC
+    btn.onclick = async () => {
+        if (!isCalling) {
+            status.innerText = "Toegang vragen...";
+            
+            // This ensures Mic permission is requested and Audio Context starts
+            try {
+                await vapi.start(assistantId);
+            } catch (err) {
+                console.error("Mic error:", err);
+                status.innerText = "Microfoon geweigerd";
+            }
+        } else {
+            vapi.stop();
+        }
+    };
+
+    vapi.on('call-start', () => {
+        isCalling = true;
+        btn.className = "btn-call stop";
+        status.innerText = "Verbonden";
+        status.style.color = "#34c759";
+    });
+
+    vapi.on('call-end', () => {
+        isCalling = false;
+        btn.className = "btn-call start";
+        status.innerText = "Gesprek beëindigd";
+        status.style.color = "#8a8d91";
+        resetBars();
+    });
+
+    // TRANSCRIPTION LOGIC
+    vapi.on('message', (m) => {
+        if (m.type === 'transcript' && m.transcriptType === 'partial') {
+            upsertMessage(m.role, m.transcript);
+        }
+    });
+
+    function upsertMessage(role, text) {
+        let lastMsg = transcriptBox.lastElementChild;
+        const cls = role === 'assistant' ? 'ai-msg' : 'user-msg';
+        
+        if (lastMsg && lastMsg.dataset.role === role) {
+            lastMsg.innerText = text;
+        } else {
+            const div = document.createElement('div');
+            div.className = `msg ${cls}`;
+            div.dataset.role = role;
+            div.innerText = text;
+            transcriptBox.appendChild(div);
+        }
+        transcriptBox.scrollTop = transcriptBox.scrollHeight;
+    }
+
+    // VISUALIZER LOGIC
+    vapi.on('volume-level', (vol) => {
+        // User visualizer
+        animate(userBars, vol);
+    });
+
+    vapi.on('speech-start', () => {
+        status.innerText = "Amelia spreekt...";
+        startAiMotion();
+    });
+
+    vapi.on('speech-end', () => {
+        status.innerText = "Aan het luisteren...";
+        stopAiMotion();
+    });
+
+    function animate(bars, vol) {
+        bars.forEach(bar => {
+            const h = Math.max(4, vol * 60 * (Math.random() + 0.5));
+            bar.style.height = `${h}px`;
+        });
+    }
+
+    let aiAnim;
+    function startAiMotion() {
+        clearInterval(aiAnim);
+        aiAnim = setInterval(() => animate(aiBars, 0.5), 100);
+    }
+    function stopAiMotion() {
+        clearInterval(aiAnim);
+        aiBars.forEach(b => b.style.height = '4px');
+    }
+    function resetBars() {
+        stopAiMotion();
+        userBars.forEach(b => b.style.height = '4px');
+    }
+</script>
+
+</body>
+</html>
